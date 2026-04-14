@@ -1,0 +1,17 @@
+starting_equity: 1000.0
+risk_level: moderate
+risk_pct: 0.005  # Reduced from 0.007 for tighter risk control
+max_drawdown_pct: 5.0
+symbols:
+  - BTC/USDT
+  - ETH/USDT
+timeframe: 5m
+thresholds:
+  long_prob: 0.6   # Need 60%+ confidence for LONG trades
+  short_prob: 0.4  # Need <40% confidence for SHORT trades
+  spread_min: 10.0
+  vol_max: 0.1
+api_key: "your-binance-api-key"
+api_secret: "your-binance-api-secret"
+testnet: true
+explanation_mode: detailed
