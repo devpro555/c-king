@@ -55,18 +55,33 @@ class OpenPosition(Base):
 
 import os
 
-# Database connection
-DATABASE_URL = (
-    os.getenv("DATABASE_URL")
-    or os.getenv("RAILWAY_DATABASE_URL")
-    or os.getenv("MYSQL_URL")
-    or "mysql+pymysql://root:password@localhost:3306/cr_king"
-)
+DB_ENV_NAMES = [
+    "DATABASE_URL",
+    "RAILWAY_DATABASE_URL",
+    "MYSQL_URL",
+    "MYSQL_DATABASE_URL",
+    "MYSQLCONNSTR",
+    "CLEARDB_DATABASE_URL",
+]
+
+DATABASE_URL = next((os.getenv(name) for name in DB_ENV_NAMES if os.getenv(name)), None)
+if DATABASE_URL is None:
+    raise RuntimeError(
+        "No database connection string was found. "
+        "Set one of the supported environment variables: "
+        + ", ".join(DB_ENV_NAMES)
+        + ".\nExample: mysql+pymysql://user:pass@host:port/db"
+    )
+
+DATABASE_URL = DATABASE_URL.strip()
+if DATABASE_URL.startswith("mysql://"):
+    DATABASE_URL = "mysql+pymysql://" + DATABASE_URL[len("mysql://"):]
+
 try:
     engine = create_engine(DATABASE_URL, echo=False)
 except ArgumentError as exc:
     raise RuntimeError(
-        f"Invalid DATABASE_URL environment variable value: {DATABASE_URL!r}. "
+        f"Invalid database connection URL: {DATABASE_URL!r}. "
         "Ensure it is a valid SQLAlchemy URL, e.g. mysql+pymysql://user:pass@host:port/db"
     ) from exc
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

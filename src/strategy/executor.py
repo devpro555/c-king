@@ -1,6 +1,8 @@
 import pandas as pd
 import logging
+import time
 from datetime import datetime
+from sqlalchemy.exc import OperationalError
 from src.exchange.binance import BinanceClient
 from src.features.indicators import regime_features
 from src.models.classifier import DirectionClassifier
@@ -17,10 +19,11 @@ class TradingExecutor:
         self.logger = logging.getLogger(__name__)
         self.settings = settings
         self.client = BinanceClient(settings["api_key"], settings["api_secret"], settings["testnet"])
-
-        # Initialize database
-        init_db()
-        self.load_from_database()
+        self.db_initialized = False
+        self.trade_log = []
+        self.open_positions = {}
+        self.state = {"equity": settings.get("starting_equity", 1000), "virtual_mode": True}
+        self.running = False
 
         self.model = DirectionClassifier()
         self.goal = {
@@ -29,7 +32,106 @@ class TradingExecutor:
             "starting_equity": self.state["equity"]
         }
         self.elapsed_days = 0
-        self.log("TradingExecutor initialized with database persistence")
+        self.logger.info("TradingExecutor created; database initialization deferred")
+
+    def initialize_database(self, retries=6, delay=5):
+        if self.db_initialized:
+            return
+
+        last_exception = None
+        for attempt in range(1, retries + 1):
+            try:
+                init_db()
+                self.load_from_database()
+                self.db_initialized = True
+                self.logger.info("Database initialized and loaded successfully")
+                return
+            except OperationalError as exc:
+                last_exception = exc
+                self.logger.warning(
+                    f"Database not ready yet (attempt {attempt}/{retries}). "
+                    f"Retrying in {delay}s..."
+                )
+                time.sleep(delay)
+            except Exception as exc:
+                self.logger.error("Unexpected database initialization error", exc_info=True)
+                raise
+
+        raise RuntimeError(
+            "Database initialization failed after "
+            f"{retries} attempts.",
+        ) from last_exception
+
+    def load_from_database(self):
+        """Load all data from database on startup"""
+        db = get_db()
+
+        # Load system state
+        system_state = db.query(SystemState).filter(SystemState.id == 1).first()
+        if system_state:
+            self.state = {
+                "equity": system_state.equity,
+                "virtual_mode": system_state.virtual_mode
+            }
+            self.running = system_state.running
+        else:
+            # Create default system state
+            self.state = {"equity": self.settings.get("starting_equity", 1000), "virtual_mode": True}
+            self.running = False
+            default_state = SystemState(
+                equity=self.state["equity"],
+                running=self.running,
+                virtual_mode=self.state["virtual_mode"]
+            )
+            db.add(default_state)
+            db.commit()
+
+        # Load trades
+        self.trade_log = []
+        trades = db.query(Trade).order_by(Trade.entry_time.desc()).limit(100).all()
+        for trade in trades:
+            self.trade_log.append({
+                "id": trade.id,
+                "symbol": trade.symbol,
+                "signal": trade.signal,
+                "side": trade.side,
+                "size": trade.size,
+                "entry_price": trade.entry_price,
+                "exit_price": trade.exit_price,
+                "pnl": trade.pnl,
+                "entry_time": trade.entry_time.isoformat() if trade.entry_time else None,
+                "exit_time": trade.exit_time.isoformat() if trade.exit_time else None,
+                "status": trade.status,
+                "explanation": trade.explanation.split('|') if trade.explanation else [],
+                "reason": trade.reason
+            })
+
+        # Load open positions
+        self.open_positions = {}
+        positions = db.query(OpenPosition).filter(OpenPosition.status == 'open').all()
+        for pos in positions:
+            self.open_positions[pos.symbol] = {
+                "symbol": pos.symbol,
+                "side": pos.side,
+                "size": pos.size,
+                "entry_price": pos.entry_price,
+                "stop_loss": pos.stop_loss,
+                "take_profit": pos.take_profit,
+                "entry_time": pos.entry_time,
+                "status": pos.status
+            }
+
+        # Load recent logs
+        self.logs = []
+        logs = db.query(LogEntry).order_by(LogEntry.timestamp.desc()).limit(200).all()
+        for log in logs:
+            self.logs.append({
+                "timestamp": log.timestamp.isoformat(),
+                "level": log.level,
+                "message": log.message
+            })
+
+        db.close()
 
     def load_from_database(self):
         """Load all data from database on startup"""

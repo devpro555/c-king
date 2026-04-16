@@ -7,7 +7,13 @@ import atexit
 
 app = FastAPI()
 settings = load_settings()
-executor = TradingExecutor(settings)
+executor = None
+
+@app.on_event("startup")
+def on_startup():
+    global executor
+    executor = TradingExecutor(settings)
+    executor.initialize_database()
 
 # Initialize scheduler
 scheduler = BackgroundScheduler()

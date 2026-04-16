@@ -62,7 +62,20 @@ Railway should use the service root `crypto-king` and the `Procfile` entry:
 web: sh -lc 'uvicorn src.app:app --host 0.0.0.0 --port $PORT'
 ```
 
-Railway will automatically provide `PORT`, and you should also set the database connection string under `DATABASE_URL`.
+Railway will automatically provide `PORT`. You must also set a valid MySQL connection string in one of the supported environment variables:
+
+- `DATABASE_URL`
+- `RAILWAY_DATABASE_URL`
+- `MYSQL_URL`
+- `MYSQL_DATABASE_URL`
+
+The expected format is a SQLAlchemy URL, for example:
+
+```text
+mysql+pymysql://user:password@host:port/database_name
+```
+
+If no supported database env var is present, the application will fail at startup rather than silently trying to connect to `localhost`.
 
 ### How to stop the backend
 
