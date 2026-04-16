@@ -52,8 +52,13 @@ class OpenPosition(Base):
     entry_time = Column(DateTime, nullable=False)
     status = Column(String(10), default='open')
 
+import os
+
 # Database connection
-DATABASE_URL = "mysql+pymysql://root:password@localhost:3306/cr_king"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "mysql+pymysql://root:password@localhost:3306/cr_king"
+)
 engine = create_engine(DATABASE_URL, echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
