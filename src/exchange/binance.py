@@ -22,7 +22,8 @@ class BinanceClient:
         if self.virtual_mode:
             # In virtual mode, we still need real market data for analysis
             temp_exchange = ccxt.binance({"enableRateLimit": True})
-            temp_exchange.set_sandbox_mode(True)
+            # Use live API for data fetching to avoid testnet restrictions
+            # temp_exchange.set_sandbox_mode(True)  # Commented out to use live API
             return temp_exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
         return self.exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
 
