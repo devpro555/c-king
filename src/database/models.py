@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
@@ -55,11 +56,19 @@ class OpenPosition(Base):
 import os
 
 # Database connection
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+pymysql://root:password@localhost:3306/cr_king"
+DATABASE_URL = (
+    os.getenv("DATABASE_URL")
+    or os.getenv("RAILWAY_DATABASE_URL")
+    or os.getenv("MYSQL_URL")
+    or "mysql+pymysql://root:password@localhost:3306/cr_king"
 )
-engine = create_engine(DATABASE_URL, echo=False)
+try:
+    engine = create_engine(DATABASE_URL, echo=False)
+except ArgumentError as exc:
+    raise RuntimeError(
+        f"Invalid DATABASE_URL environment variable value: {DATABASE_URL!r}. "
+        "Ensure it is a valid SQLAlchemy URL, e.g. mysql+pymysql://user:pass@host:port/db"
+    ) from exc
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
