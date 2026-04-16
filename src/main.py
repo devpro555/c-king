@@ -1,5 +1,5 @@
-from strategy.executor import TradingExecutor
-from utils.config import load_settings
+from src.strategy.executor import TradingExecutor
+from src.utils.config import load_settings
 import time
 
 settings = load_settings()

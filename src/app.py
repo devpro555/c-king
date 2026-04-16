@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from strategy.executor import TradingExecutor
-from utils.config import load_settings
+from src.strategy.executor import TradingExecutor
+from src.utils.config import load_settings
 from apscheduler.schedulers.background import BackgroundScheduler
 import atexit
 
