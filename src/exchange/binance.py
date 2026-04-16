@@ -21,9 +21,8 @@ class BinanceClient:
     def fetch_ohlcv(self, symbol="BTC/USDT", timeframe="5m", limit=500):
         if self.virtual_mode:
             # In virtual mode, we still need real market data for analysis
-            temp_exchange = ccxt.binance({"enableRateLimit": True})
-            # Use live API for data fetching to avoid testnet restrictions
-            # temp_exchange.set_sandbox_mode(True)  # Commented out to use live API
+            # Use KuCoin instead of Binance to avoid geo-restrictions
+            temp_exchange = ccxt.kucoin({"enableRateLimit": True})
             return temp_exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
         return self.exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
 
