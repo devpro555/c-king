@@ -64,15 +64,24 @@ DB_ENV_NAMES = [
     "CLEARDB_DATABASE_URL",
 ]
 
-# Remove module-level DATABASE_URL and engine creation
-# Move to init_db()
+# Engine and session factory are created lazily on first call to init_db() so
+# that this module can be imported before the DATABASE_URL environment variable
+# has been resolved (e.g. Railway reference variables are only available at
+# runtime, not at module-import time).
+_engine = None
+_SessionLocal = None
 
-def init_db():
-    """Initialize database tables and connection"""
-    global engine, SessionLocal
-    
-    DATABASE_URL = next((os.getenv(name) for name in DB_ENV_NAMES if os.getenv(name)), None)
-    if DATABASE_URL is None:
+
+def _build_engine():
+    """Resolve the database URL and create the SQLAlchemy engine.
+
+    Called once from init_db(); raises RuntimeError with a clear message when
+    no supported environment variable is set.
+    """
+    global _engine, _SessionLocal
+
+    database_url = next((os.getenv(name) for name in DB_ENV_NAMES if os.getenv(name)), None)
+    if database_url is None:
         raise RuntimeError(
             "No database connection string was found. "
             "Set one of the supported environment variables: "
@@ -80,26 +89,43 @@ def init_db():
             + ".\nExample: mysql+pymysql://user:pass@host:port/db"
         )
 
-    DATABASE_URL = DATABASE_URL.strip()
-    if DATABASE_URL.startswith("mysql://"):
-        DATABASE_URL = "mysql+pymysql://" + DATABASE_URL[len("mysql://"):]
+    database_url = database_url.strip()
+    if database_url.startswith("mysql://"):
+        database_url = "mysql+pymysql://" + database_url[len("mysql://"):]
 
     try:
-        engine = create_engine(DATABASE_URL, echo=False)
+        _engine = create_engine(database_url, echo=False)
     except ArgumentError as exc:
         raise RuntimeError(
-            f"Invalid database connection URL: {DATABASE_URL!r}. "
+            f"Invalid database connection URL: {database_url!r}. "
             "Ensure it is a valid SQLAlchemy URL, e.g. mysql+pymysql://user:pass@host:port/db"
         ) from exc
-    
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    Base.metadata.create_all(bind=engine)
+
+    _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+
+
+def init_db():
+    """Resolve the database URL, create the engine, and initialise tables.
+
+    Safe to call multiple times; engine creation is skipped on subsequent
+    calls.
+    """
+    if _engine is None:
+        _build_engine()
+    Base.metadata.create_all(bind=_engine)
+
 
 def get_db():
-    """Get database session"""
-    if 'SessionLocal' not in globals():
-        raise RuntimeError("Database not initialized. Call init_db() first.")
-    db = SessionLocal()
+    """Return a new database session.
+
+    init_db() must have been called before this function is used.
+    """
+    if _SessionLocal is None:
+        raise RuntimeError(
+            "Database has not been initialised. "
+            "Call init_db() (via TradingExecutor.initialize_database()) before using get_db()."
+        )
+    db = _SessionLocal()
     try:
         return db
     finally:
