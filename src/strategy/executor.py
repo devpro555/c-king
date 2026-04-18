@@ -331,7 +331,7 @@ class TradingExecutor:
         # Update position status in database
         db_position = db.query(OpenPosition).filter(OpenPosition.symbol == symbol, OpenPosition.status == 'open').first()
         if db_position:
-            db_position.status = 'closed'
+            db.delete(db_position)  # Delete the closed position from open_positions
 
         # Update system state
         system_state = db.query(SystemState).filter(SystemState.id == 1).first()
