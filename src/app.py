@@ -75,8 +75,30 @@ def set_mode(request: ModeRequest):
     return {"mode": request.mode}
 
 @app.get("/trades")
-def get_trades():
-    return executor.trade_log[-20:]
+def get_trades(limit: int = 50):
+    """Get most recent trades from database"""
+    from src.database.models import get_db, Trade
+    db = get_db()
+    trades = db.query(Trade).order_by(Trade.entry_time.desc()).limit(limit).all()
+    result = []
+    for trade in trades:
+        result.append({
+            "id": trade.id,
+            "symbol": trade.symbol,
+            "signal": trade.signal,
+            "side": trade.side,
+            "size": trade.size,
+            "entry_price": trade.entry_price,
+            "exit_price": trade.exit_price,
+            "pnl": trade.pnl,
+            "entry_time": trade.entry_time.isoformat() if trade.entry_time else None,
+            "exit_time": trade.exit_time.isoformat() if trade.exit_time else None,
+            "status": trade.status,
+            "explanation": trade.explanation.split('|') if trade.explanation else [],
+            "reason": trade.reason
+        })
+    db.close()
+    return result
 
 @app.get("/explain")
 def explain_trade(trade_id: str):
@@ -145,9 +167,28 @@ def get_performance():
 
 @app.get("/positions")
 def get_positions():
+    """Get all open positions from database"""
+    from src.database.models import get_db, OpenPosition
+    db = get_db()
+    positions = db.query(OpenPosition).filter(OpenPosition.status == 'open').all()
+    result = []
+    for pos in positions:
+        result.append({
+            "id": pos.id,
+            "symbol": pos.symbol,
+            "side": pos.side,
+            "size": pos.size,
+            "entry_price": pos.entry_price,
+            "stop_loss": pos.stop_loss,
+            "take_profit": pos.take_profit,
+            "entry_time": pos.entry_time.isoformat() if pos.entry_time else None,
+            "status": pos.status
+        })
+    db.close()
     return {
-        "open_positions": executor.open_positions,
-        "position_count": len(executor.open_positions)
+        "open_positions": result,
+        "position_count": len(result)
+    }
     }
 
 @app.post("/close-position/{symbol}")

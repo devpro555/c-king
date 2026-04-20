@@ -233,14 +233,11 @@ class TradingExecutor:
             "prob_up": prob_up,
             "explanation": explanation
         }
+        # Store in memory (overwrite if exists for this symbol, but DB will have all)
         self.open_positions[symbol] = position
 
-        # Save position to database
+        # Save position to database (allow multiple positions per symbol)
         db = get_db()
-        # Clean up any existing position for this symbol (defensive programming)
-        existing = db.query(OpenPosition).filter(OpenPosition.symbol == symbol).first()
-        if existing:
-            db.delete(existing)
         db_position = OpenPosition(
             symbol=symbol,
             side=side,

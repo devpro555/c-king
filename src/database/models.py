@@ -1,3 +1,6 @@
+import logging
+import os
+
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
 from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.declarative import declarative_base
@@ -44,7 +47,7 @@ class OpenPosition(Base):
     __tablename__ = 'open_positions'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(20), nullable=False, unique=True)
+    symbol = Column(String(20), nullable=False)
     side = Column(String(10), nullable=False)
     size = Column(Float, nullable=False)
     entry_price = Column(Float, nullable=False)
@@ -70,19 +73,18 @@ DB_ENV_NAMES = [
 def init_db():
     """Initialize database tables and connection"""
     global engine, SessionLocal
-    
-    DATABASE_URL = next((os.getenv(name) for name in DB_ENV_NAMES if os.getenv(name)), None)
-    if DATABASE_URL is None:
-        raise RuntimeError(
-            "No database connection string was found. "
-            "Set one of the supported environment variables: "
-            + ", ".join(DB_ENV_NAMES)
-            + ".\nExample: mysql+pymysql://user:pass@host:port/db"
-        )
 
-    DATABASE_URL = DATABASE_URL.strip()
-    if DATABASE_URL.startswith("mysql://"):
-        DATABASE_URL = "mysql+pymysql://" + DATABASE_URL[len("mysql://"):]
+    DATABASE_URL = next((os.getenv(name) for name in DB_ENV_NAMES if os.getenv(name) and os.getenv(name).strip()), None)
+    if DATABASE_URL is None:
+        logging.warning(
+            "No database environment variable found; falling back to local SQLite database at ./local.db. "
+            "Set DATABASE_URL or another supported env var for production/Railway deployments."
+        )
+        DATABASE_URL = "sqlite:///./local.db"
+    else:
+        DATABASE_URL = DATABASE_URL.strip()
+        if DATABASE_URL.startswith("mysql://"):
+            DATABASE_URL = "mysql+pymysql://" + DATABASE_URL[len("mysql://"):]
 
     try:
         engine = create_engine(DATABASE_URL, echo=False)
