@@ -189,7 +189,6 @@ def get_positions():
         "open_positions": result,
         "position_count": len(result)
     }
-    }
 
 @app.post("/close-position/{symbol}")
 def close_position(symbol: str):
