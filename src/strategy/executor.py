@@ -237,6 +237,10 @@ class TradingExecutor:
 
         # Save position to database
         db = get_db()
+        # Clean up any existing position for this symbol (defensive programming)
+        existing = db.query(OpenPosition).filter(OpenPosition.symbol == symbol).first()
+        if existing:
+            db.delete(existing)
         db_position = OpenPosition(
             symbol=symbol,
             side=side,
