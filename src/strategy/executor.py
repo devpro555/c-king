@@ -241,10 +241,10 @@ class TradingExecutor:
         db_position = OpenPosition(
             symbol=symbol,
             side=side,
-            size=size,
-            entry_price=price,
-            stop_loss=stop_loss,
-            take_profit=take_profit,
+            size=float(size),
+            entry_price=float(price),
+            stop_loss=float(stop_loss),
+            take_profit=float(take_profit),
             entry_time=position['entry_time'],
             status='open'
         )
