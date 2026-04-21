@@ -97,6 +97,23 @@ def init_db():
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
 
+    # Drop stale unique constraint on open_positions.symbol if it exists (MySQL only).
+    # This constraint was created in an earlier schema version and prevents the bot
+    # from correctly tracking open positions after a restart.
+    if DATABASE_URL and "mysql" in DATABASE_URL:
+        try:
+            with engine.connect() as conn:
+                conn.execute(
+                    __import__("sqlalchemy").text(
+                        "ALTER TABLE open_positions DROP INDEX symbol"
+                    )
+                )
+                conn.commit()
+                logging.info("Dropped unique constraint 'symbol' from open_positions table")
+        except Exception:
+            # Constraint doesn't exist or already dropped — safe to ignore
+            pass
+
 def get_db():
     """Get database session"""
     if 'SessionLocal' not in globals():

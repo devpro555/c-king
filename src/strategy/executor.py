@@ -133,77 +133,6 @@ class TradingExecutor:
 
         db.close()
 
-    def load_from_database(self):
-        """Load all data from database on startup"""
-        db = get_db()
-
-        # Load system state
-        system_state = db.query(SystemState).filter(SystemState.id == 1).first()
-        if system_state:
-            self.state = {
-                "equity": system_state.equity,
-                "virtual_mode": system_state.virtual_mode
-            }
-            self.running = system_state.running
-        else:
-            # Create default system state
-            self.state = {"equity": self.settings.get("starting_equity", 1000), "virtual_mode": True}
-            self.running = False
-            default_state = SystemState(
-                equity=self.state["equity"],
-                running=self.running,
-                virtual_mode=self.state["virtual_mode"]
-            )
-            db.add(default_state)
-            db.commit()
-
-        # Load trades
-        self.trade_log = []
-        trades = db.query(Trade).order_by(Trade.entry_time.desc()).limit(100).all()
-        for trade in trades:
-            self.trade_log.append({
-                "id": trade.id,
-                "symbol": trade.symbol,
-                "signal": trade.signal,
-                "side": trade.side,
-                "size": trade.size,
-                "entry_price": trade.entry_price,
-                "exit_price": trade.exit_price,
-                "pnl": trade.pnl,
-                "entry_time": trade.entry_time.isoformat() if trade.entry_time else None,
-                "exit_time": trade.exit_time.isoformat() if trade.exit_time else None,
-                "status": trade.status,
-                "explanation": trade.explanation.split('|') if trade.explanation else [],
-                "reason": trade.reason
-            })
-
-        # Load open positions
-        self.open_positions = {}
-        positions = db.query(OpenPosition).filter(OpenPosition.status == 'open').all()
-        for pos in positions:
-            self.open_positions[pos.symbol] = {
-                "symbol": pos.symbol,
-                "side": pos.side,
-                "size": pos.size,
-                "entry_price": pos.entry_price,
-                "stop_loss": pos.stop_loss,
-                "take_profit": pos.take_profit,
-                "entry_time": pos.entry_time,
-                "status": pos.status
-            }
-
-        # Load recent logs
-        self.logs = []
-        logs = db.query(LogEntry).order_by(LogEntry.timestamp.desc()).limit(200).all()
-        for log in logs:
-            self.logs.append({
-                "timestamp": log.timestamp.isoformat(),
-                "level": log.level,
-                "message": log.message
-            })
-
-        db.close()
-
     def log(self, message, level="INFO"):
         timestamp = datetime.now()
         log_entry = {"timestamp": timestamp.isoformat(), "level": level, "message": message}
@@ -233,23 +162,36 @@ class TradingExecutor:
             "prob_up": prob_up,
             "explanation": explanation
         }
-        # Store in memory (overwrite if exists for this symbol, but DB will have all)
+        # Store in memory
         self.open_positions[symbol] = position
 
-        # Save position to database (allow multiple positions per symbol)
+        # Save position to database only if no open position already exists for this symbol
         db = get_db()
-        db_position = OpenPosition(
-            symbol=symbol,
-            side=side,
-            size=float(size),
-            entry_price=float(price),
-            stop_loss=float(stop_loss),
-            take_profit=float(take_profit),
-            entry_time=position['entry_time'],
-            status='open'
-        )
-        db.add(db_position)
-        db.commit()
+        existing_position = db.query(OpenPosition).filter(
+            OpenPosition.symbol == symbol, OpenPosition.status == 'open'
+        ).first()
+        if not existing_position:
+            db_position = OpenPosition(
+                symbol=symbol,
+                side=side,
+                size=float(size),
+                entry_price=float(price),
+                stop_loss=float(stop_loss),
+                take_profit=float(take_profit),
+                entry_time=position['entry_time'],
+                status='open'
+            )
+            db.add(db_position)
+            db.commit()
+        else:
+            # Update the existing record instead of inserting a duplicate
+            existing_position.side = side
+            existing_position.size = float(size)
+            existing_position.entry_price = float(price)
+            existing_position.stop_loss = float(stop_loss)
+            existing_position.take_profit = float(take_profit)
+            existing_position.entry_time = position['entry_time']
+            db.commit()
         db.close()
 
         # Add to trade log immediately when position opens
