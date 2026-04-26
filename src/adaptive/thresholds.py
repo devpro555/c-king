@@ -3,9 +3,11 @@ def adjust_thresholds(equity, goal, days_left):
     progress = equity - goal["starting_equity"]
     expected = target * (1 - days_left / goal["days"])
     
-    # If we're behind on profit targets, be more aggressive with trading
+    # CRITICAL FIX: Never lower thresholds when behind - this caused the losses!
+    # Instead, reduce position size and be MORE selective
     if progress < expected:
-        return {"long_prob": 0.50, "risk_pct": 0.01}  # More aggressive signals
+        # Behind on targets: RAISE standards, not lower them
+        return {"long_prob": 0.75, "risk_pct": 0.005}  # More selective, smaller size
     
-    # When ahead, be more conservative
-    return {"long_prob": 0.58, "risk_pct": 0.007}
+    # When on track, maintain strict standards
+    return {"long_prob": 0.75, "risk_pct": 0.005}

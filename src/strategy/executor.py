@@ -419,8 +419,18 @@ class TradingExecutor:
 
         atr = row["atr"]
         size = position_size(self.state["equity"], self.settings["risk_pct"], atr)
+        
+        # CRITICAL FIX: Reduce position size for marginal signals
+        # If confidence is just barely above threshold, use smaller position
+        confidence_margin = abs(prob_up - 0.5)  # Distance from 50/50
+        if confidence_margin < 0.15:  # Less than 65% confidence (between 50-65%)
+            size *= 0.5  # Use 50% position size for weak signals
+        elif confidence_margin < 0.20:  # Less than 70% confidence (between 50-70%)
+            size *= 0.75  # Use 75% position size for weak-medium signals
+        # Full size only for high conviction (70%+ confidence)
+        
         side = "buy" if signal == "LONG" else "sell"
-        self.log(f"Calculated position: size={size}, side={side}, ATR={atr}")
+        self.log(f"Calculated position: size={size}, side={side}, ATR={atr}, confidence={confidence_margin:.2%}")
 
         order = self.client.place_order(symbol, side, size, order_type="market")
         self.log(f"Order placed: {order}")

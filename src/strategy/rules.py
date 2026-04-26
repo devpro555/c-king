@@ -2,9 +2,10 @@ def ensemble_signal(prob_up: float, df_row, thresholds):
     """
     Generate balanced LONG/SHORT signals with trend awareness and ensemble logic
     """
-    # Main criteria: model confidence with balanced thresholds
-    long_signal = prob_up > 0.6   # Need 60%+ confidence for LONG
-    short_signal = prob_up < 0.4  # Need <40% confidence for SHORT (strong down prediction)
+    # CRITICAL FIX: Increase thresholds to prevent overconfident trades
+    # Only take high-conviction signals: 75%+ for LONG, 25%- for SHORT
+    long_signal = prob_up > 0.75   # Need 75%+ confidence for LONG
+    short_signal = prob_up < 0.25  # Need <25% confidence for SHORT (very strong down prediction)
 
     # Ensemble factors for additional confirmation
     ensemble_score = 0
@@ -29,11 +30,11 @@ def ensemble_signal(prob_up: float, df_row, thresholds):
         bb_upper = bb_position > 0.8  # Price near upper band
         bb_lower = bb_position < 0.2  # Price near lower band
 
-        # Volatility filter
-        vol_ok = df_row.get("vol", 0) < thresholds.get("vol_max", 0.1)
+        # CRITICAL: Strict volatility filter - skip choppy markets
+        vol_ok = df_row.get("vol", 0) < thresholds.get("vol_max", 0.05)  # Reduced threshold from 0.1 to 0.05
 
         if not vol_ok:
-            return "FLAT"  # Skip if too volatile
+            return "FLAT"  # Skip if too volatile - avoid whipsaws
 
         # Build ensemble score
         if long_signal:
@@ -43,7 +44,7 @@ def ensemble_signal(prob_up: float, df_row, thresholds):
             if macd_up: ensemble_score += 1
             if bb_lower: ensemble_score += 0.5  # Potential bounce from lower band
 
-            if ensemble_score >= 3:  # Need at least 3 points for LONG
+            if ensemble_score >= 4.5:  # CRITICAL: Raise bar to 4.5+ for LONG (need strong confirmation)
                 return "LONG"
 
         elif short_signal:
@@ -53,7 +54,7 @@ def ensemble_signal(prob_up: float, df_row, thresholds):
             if macd_down: ensemble_score += 1
             if bb_upper: ensemble_score += 0.5  # Potential rejection from upper band
 
-            if ensemble_score >= 3:  # Need at least 3 points for SHORT
+            if ensemble_score >= 4.5:  # CRITICAL: Raise bar to 4.5+ for SHORT (need strong confirmation)
                 return "SHORT"
 
     except Exception as e:

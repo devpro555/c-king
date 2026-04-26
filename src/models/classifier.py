@@ -9,7 +9,9 @@ class DirectionClassifier:
 
     def prepare(self, df: pd.DataFrame):
         """Prepare features for training with enhanced indicators"""
-        y = (df["close"].shift(-1) > df["close"]).astype(int)
+        # CRITICAL: Use shift(1) instead of shift(-1) to avoid look-ahead bias
+        # We predict based on current bar, not next bar (which would be future data)
+        y = (df["close"] > df["close"].shift(1)).astype(int)
 
         # Use all available technical indicators
         feature_cols = [

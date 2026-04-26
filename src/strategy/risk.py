@@ -10,17 +10,18 @@ def position_size(equity_usd: float, risk_pct: float, atr: float, tick_value: fl
         units = 0.01
     return units
 
-def stops(entry_price: float, atr: float, direction: str, k=1.0):
+def stops(entry_price: float, atr: float, direction: str, k=2.0):
     """
-    Calculate stop loss and take profit with tighter risk control
-    k=1.0 means stop loss at 1 ATR away (tighter than previous 1.5)
+    Calculate stop loss and take profit with wider stops to avoid whipsaws
+    k=2.0 means stop loss at 2 ATR away (prevents premature stops from noise)
+    CRITICAL: Increased k from 1.0 to 2.0 to reduce false stops
     """
     if direction == "LONG":
         stop_loss = entry_price - k * atr
-        take_profit = entry_price + 2 * k * atr  # 2:1 reward-to-risk ratio
+        take_profit = entry_price + 3 * k * atr  # 3:1 reward-to-risk ratio (better returns)
         return {"stop_loss": stop_loss, "take_profit": take_profit}
     if direction == "SHORT":
         stop_loss = entry_price + k * atr
-        take_profit = entry_price - 2 * k * atr  # 2:1 reward-to-risk ratio
+        take_profit = entry_price - 3 * k * atr  # 3:1 reward-to-risk ratio (better returns)
         return {"stop_loss": stop_loss, "take_profit": take_profit}
     return {"stop_loss": None, "take_profit": None}
